@@ -43,6 +43,10 @@ app.get('*', async function(req, res) {
 });
 
 async function reloadFiles() {
+    /**
+     * @type {Map<string, {file: string, type: string, basename: string, size: number}>}
+     */
+    var toreturn = new Map();
     const Files = fs.readdirSync(path.join(__dirname, 'files')).filter(f => f.endsWith('.json'));
     for(const File of Files) {
         const info = require(path.join(__dirname, 'files', File));
@@ -51,9 +55,39 @@ async function reloadFiles() {
         const type = mime.lookup(file);
         const size = fs.statSync(file).size;
         FilesInfo.set(info.get, {file, basename, type, size});
+        toreturn.set(info.get, {file, basename, type, size});
     }
+    return toreturn;
+}
+
+async function YAMLreloadFiles() {
+    /**
+     * @type {Map<string, {file: string, type: string, basename: string, size: number}>}
+     */
+    var toreturn = new Map();
+    const Files = fs.readdirSync(path.join(__dirname, 'files')).filter(f => f.endsWith('.yaml'));
+    for(const File of Files) {
+        const Data = fs.readFileSync(path.join(__dirname, 'files', File), { encoding: 'utf-8' });
+        const SData = Data.toString('utf-8').replace(/\n/g, '').split(/[:\s\n]+/g);
+        /**
+         * @type {{file: string, get: string}}
+         */
+        const toJSON = {}
+        for(var i = 0; i <= SData.length/2; i+=2) {
+            toJSON[SData[i]] = SData[i+1];
+            console.log(toJSON[SData[i]], SData[i+1]);
+        }
+        const file = path.join(__dirname, 'files', toJSON.file);
+        const basename = path.basename(file);
+        const type = mime.lookup(file);
+        const size = fs.statSync(file).size;
+        FilesInfo.set(toJSON.get, {file, basename, type, size});
+        toreturn.set(toJSON.get, {file, basename, type, size});
+    }
+    return toreturn;
 }
 
 app.listen(PORT, async function() {
     await reloadFiles();
+    await YAMLreloadFiles();
 });
