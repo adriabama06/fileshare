@@ -2,10 +2,11 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const mime = require('mime-types');
+const YAML = require('yaml');
 
 const app = express();
 
-const PORT = 8080;
+const PORT = 6060;
 
 /**
  * @type {Map<string, {file: string, type: string, basename: string, size: number}>}
@@ -13,11 +14,11 @@ const PORT = 8080;
 const FilesInfo = new Map();
 
 app.get('/d/:file', async function(req, res) {
-    /*if(!req.params.file || !FilesInfo.has(req.params.file)) {
+    if(!req.params.file || !FilesInfo.has(req.params.file)) {
         res.writeHead(404, 'File not found');
         res.send()
         return;
-    }*/
+    }
     const File = FilesInfo.get(req.params.file);
 
     res.setHeader('Content-Length', File.size);
@@ -67,16 +68,18 @@ async function YAMLreloadFiles() {
     var toreturn = new Map();
     const Files = fs.readdirSync(path.join(__dirname, 'files')).filter(f => f.endsWith('.yaml'));
     for(const File of Files) {
-        const Data = fs.readFileSync(path.join(__dirname, 'files', File), { encoding: 'utf-8' });
-        const SData = Data.toString('utf-8').replace(/\n/g, '').split(/[:\s\n]+/g);
+        const Data = fs.readFileSync(path.join(__dirname, 'files', File), { encoding: 'utf8' });
+        /*const SData = Data.toString('utf-8').replace(/\n/g, '').split(/[:\s\n]+/g);
         /**
          * @type {{file: string, get: string}}
-         */
+         *\/
         const toJSON = {}
         for(var i = 0; i <= SData.length/2; i+=2) {
             toJSON[SData[i]] = SData[i+1];
             console.log(toJSON[SData[i]], SData[i+1]);
-        }
+        }*/
+        const toJSON = YAML.parse(Data);
+
         const file = path.join(__dirname, 'files', toJSON.file);
         const basename = path.basename(file);
         const type = mime.lookup(file);
@@ -90,4 +93,9 @@ async function YAMLreloadFiles() {
 app.listen(PORT, async function() {
     await reloadFiles();
     await YAMLreloadFiles();
+    fs.watch(path.join(__dirname, 'files'), { encoding: 'utf8' }, async () => {
+        FilesInfo.clear();
+        await reloadFiles();
+        await YAMLreloadFiles();
+    });
 });
